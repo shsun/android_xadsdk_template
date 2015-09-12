@@ -1,0 +1,166 @@
+<project name="AndroidAdSDK" default="test" basedir=".">
+
+    <property environment="env" />
+    <condition property="sdk.dir" value="${env.ANDROID_HOME}">
+        <isset property="env.ANDROID_HOME" />
+    </condition>
+    <condition property="ant.dir" value="${env.ANT_HOME}">
+        <isset property="env.ANT_HOME" />
+    </condition>
+
+    <property name="ant.libs" value="./tools/ant_libs"/>
+
+    <taskdef name="svn" 
+        classname="org.tigris.subversion.svnant.SvnTask" 
+        classpath="${ant.libs}/svnant.jar:${ant.libs}/svnjavahl.jar:${ant.libs}/svnClientAdapter.jar" />
+    <path id="path.svnant">
+        <pathelement location="${ant.libs}/antelopetasks-3.2.10.jar" />
+        <pathelement location="${ant.libs}/svnant.jar"/>
+        <pathelement location="${ant.libs}/svnClientAdapter.jar"/>
+        <pathelement location="${ant.libs}/svnkit-1.7.5-v1.jar" />
+        <pathelement location="${ant.libs}/svnkit-javahl16-1.7.5-v1.jar" />
+        <pathelement location="${ant.libs}/sqljet-1.1.4.jar" />
+        <pathelement location="${ant.libs}/antlr-runtime-3.4.jar" />
+        <pathelement location="${ant.libs}/sequence-library-1.0.2.jar" />
+    </path>
+    <typedef resource="org/tigris/subversion/svnant/svnantlib.xml" classpathref="path.svnant"/> 
+
+
+    <taskdef resource="net/sf/antcontrib/antcontrib.properties">
+        <classpath location="${ant.libs}/ant-contrib-1.0b3.jar"/>
+    </taskdef>
+
+    <!--  -->
+    <property name="tools.dir" value="./tools"/>
+
+    <property name="android.project.classpath" value="./bin/classes/"/>
+    
+    <property name="test.project.libs.dir" value="./test/libs/"/>
+    <property name="test.project.build.dir" value="./test/bin/"/>
+    <property name="test.project.source.dir" value="./test/src/"/>
+    <property name="test.report.dir" value="./test-reports/"/>
+    <property name="test.style.dir" value="${tools.dir}/junit.style/"/>
+
+    <filelist id="test.android_jars" dir="${test.project.libs.dir}">
+        <file name="android.jar"/>
+        <file name="maps.jar"/>
+    </filelist>
+
+    <filelist id="test.libs_jars" dir="${test.project.libs.dir}">
+        <file name="junit.jar"/>
+        <file name="hamcrest.jar"/>
+        <file name="robolectric-with-dependencies.jar"/>
+    </filelist>
+
+    <path id="test.compile_classpath">
+        <filelist refid="test.libs_jars"/>
+        <filelist refid="test.android_jars"/>
+        <pathelement path="${android.project.classpath}"/>
+        <pathelement path="${test.project.build.dir}"/>
+    </path>
+
+    <path id="test.classpth">
+        <pathelement path="${test.project.build.dir}"/>
+        <pathelement path="${android.project.classpath}"/>
+        <!-- junit.jar must come before android.jar! -->
+        <filelist refid="test.libs_jars"/>
+        <filelist refid="test.android_jars"/>
+    </path>
+
+
+    <!--  -->
+    <target name="clean" description="Clean up" >
+        <delete dir="${test.project.build.dir}"/>
+        <delete dir="${test.report.dir}"/>
+        <delete dir="${test.report.dir}"/>
+        <delete file="${basedir}/tmp/cached-robolectric-classes.jar"/>
+    </target>
+
+    <!--  -->
+    <target name="test" depends="_do_test" description="Run junit test and generate html reports">
+        <mkdir dir="${test.report.dir}"/>
+        <junitreport todir="${test.report.dir}">
+            <fileset dir="${test.report.dir}" includes="TEST-*.xml" />
+            <report styledir="${test.style.dir}" format="noframes" todir="${test.report.dir}"/>
+        </junitreport>
+    </target>
+
+    <!--
+    ===========================================================================
+    
+    send mail with unit test report if testing failed
+
+    ===========================================================================
+    -->
+    <path id="mail.path">
+        <pathelement location="${ant.libs}/mail-1.4.4.jar"/>
+        <pathelement location="${ant.libs}/activation-1.1.jar"/>
+    </path>
+    <!-- http://enitsys.sourceforge.net/ant-classloadertask/ -->
+    <taskdef name="classloadertask" classname="org.apache.tools.ant.taskdefs.ClassloaderTask" classpath="${ant.libs}/ant-classloadertask.jar"/>
+    <classloadertask classpathRef="mail.path" loader="thread"/> 
+    <target name="mail" if="${test.failed}" depends="test" description="Send mail with unit test report">
+        <loadfile property="junit.report.file.content" srcFile="${test.report.dir}/junit-noframes.html"/>
+        <mail mailhost="smtp.163.com" 
+                mailport="25" 
+                user="sunshanghai625" 
+                password="13426096674" 
+                subject="${ant.project.name} UnitTest Report" 
+                from="sunshanghai625@163.com"
+                tolist="89090125@qq.com,sunshanghai625@163.com"
+                charset="utf-8" 
+                encoding="mime"
+                messagemimetype="text/html">
+            <message>${junit.report.file.content}</message>
+        </mail>
+    </target>
+
+
+    <!--
+    ===========================================================================
+    
+    private targets
+
+    ===========================================================================
+    -->
+    <target name="_test_init">
+        <tstamp/>
+        <mkdir dir="${test.project.build.dir}"/>
+    </target>
+
+    <target name="_compile_test" depends="_test_init">
+        <javac srcdir="${test.project.source.dir}" destdir="${test.project.build.dir}" debug="true" includeantruntime="true">
+            <classpath refid="test.compile_classpath" />
+        </javac>
+    </target>
+
+    <target name="_do_test" depends="_compile_test">
+        <mkdir dir="${test.report.dir}"/>
+        <echo message="Running JUnit Tests in directory ${test.project.source.dir}..."/>
+        <junit showoutput="true" printsummary="yes" failureproperty="test.failed" fork="yes" forkmode="once" maxmemory="512m">
+            <formatter type="plain"/>
+            <formatter type="xml"/>
+            <batchtest todir="${test.report.dir}">
+                <fileset dir="${test.project.source.dir}">
+                    <include name="**/*Test.java"/>
+                </fileset>
+            </batchtest>
+            <classpath refid="test.classpth"/>
+        </junit>
+        <!--
+        <fail if="${test.failed}" message="Unit test(s) failed. See reports in ${test.report.dir}"/>
+        -->
+        <loadfile property="avata" srcFile="${tools.dir}/test.fail.properties"/>
+        <if>
+            <equals arg1="${test.failed}" arg2="true"/>  
+            <then>
+                <echo>${avata}</echo>                  
+                <echo>Unit test(s) failed. See reports in ${test.report.dir}</echo>  
+            </then> 
+            <else>  
+                <echo>Unit test(s) success.</echo>  
+            </else>  
+        </if>
+    </target>
+
+</project>

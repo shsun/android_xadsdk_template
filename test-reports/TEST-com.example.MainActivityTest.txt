@@ -1,0 +1,9 @@
+Testsuite: com.example.MainActivityTest
+Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 1.745 sec
+------------- Standard Output ---------------
+Warning: an error occurred while binding shadow class: ShadowNdefMessage
+Warning: an error occurred while binding shadow class: ShadowNdefRecord
+Warning: an error occurred while binding shadow class: ShadowNfcAdapter
+------------- ---------------- ---------------
+
+Testcase: test_equal took 1.698 sec
